@@ -117,6 +117,9 @@ app.get("/api/generate-empid", async (req, res) => {
   }
 });
 
+app.all("*",(req,res)=>{
+  res.send("Hello")
+})
 
 
 const PORT = process.env.PORT || 5000;
