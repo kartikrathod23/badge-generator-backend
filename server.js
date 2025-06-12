@@ -35,7 +35,12 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
   try {
     const formFields = JSON.parse(req.body.formData);
 
-    const { firstName, lastName } = formFields;
+    const { firstName, lastName,email } = formFields;
+
+    const existingUser = await FormSubmission.findOne({ email: email.toLowerCase().trim() });
+    if (existingUser) {
+      return res.status(409).json({ message: "User with this email already exists" });
+    }
 
     // 1. Generate office email
     const base = `${firstName.toLowerCase()}.${lastName.toLowerCase()}`;
@@ -44,8 +49,14 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
       firstName: new RegExp(`^${firstName}$`, 'i'),
       lastName: new RegExp(`^${lastName}$`, 'i')
     });
-    const emailSuffix = String(count).padStart(2, '0');
-    const officeEmail = `${base}${emailSuffix}@${domain}`;
+
+    let suffix = "";
+    if(count>1){
+      suffix = String(count).padStart(2, '0'); // e.g., 01, 02
+    }
+
+    suffix = String(count).padStart(2, '0');
+    const officeEmail = `${base}${suffix}@${domain}`;
 
     // 2. Generate employee ID
     const totalUsers = await FormSubmission.countDocuments();
@@ -95,7 +106,10 @@ app.post("/api/generate-email", async (req, res) => {
     });
 
     // Generate email with count + 1
-    const suffix = String(count).padStart(2, '0'); // e.g., 01, 02
+    let suffix = "";
+    if(count>1){
+      suffix = String(count).padStart(2, '0'); // e.g., 01, 02
+    }
     const finalEmail = `${base}${suffix}@${domain}`;
 
     res.json({ email: finalEmail, count });
@@ -117,9 +131,13 @@ app.get("/api/generate-empid", async (req, res) => {
   }
 });
 
-app.all("*",(req,res)=>{
-  res.send("Hello")
-})
+// app.all("/*",(req,res)=>{
+//   res.send("Hello")
+// })
+
+// app.all("*",(req,res)=>{
+//   res.send("Hello")
+// })
 
 
 const PORT = process.env.PORT || 5000;
