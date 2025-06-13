@@ -2,7 +2,8 @@ const fs = require('fs');
 const XLSX = require('xlsx');
 const path = require('path');
 
-const exportDir = path.join(__dirname, 'exports');
+// Use /tmp instead of __dirname to be compatible with Vercel
+const exportDir = path.join('/tmp', 'exports');
 if (!fs.existsSync(exportDir)) {
     fs.mkdirSync(exportDir);
 }
@@ -30,4 +31,4 @@ function saveToExcel(newData) {
     XLSX.writeFile(workbook, excelFilePath);
 }
 
-module.exports = saveToExcel;
+module.exports = { saveToExcel, excelFilePath };

@@ -4,7 +4,7 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
-const saveToExcel = require('./saveToExcel');
+const { saveToExcel, excelFilePath } = require('./saveToExcel');
 require('dotenv').config();
 
 const FormSubmission = require('./models/FormSubmission');
@@ -73,34 +73,19 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
 
     await newSubmission.save();
 
-    /*
-    firstName: String,
-    lastName: String,
-    email: String,
-    phone: String,
-    city: String,
-    profileImage: String, // You'll need to handle file uploads separately
-    heardFrom: String,
-    selectedRole: String,
-    futureVision: String,
-    onboardingExperience: String,
-    officeEmail: String,
-    employeeId: String,
-    */
-
     saveToExcel({
       firstName,
       lastName,
       email,
-      phone:formFields.phone,
-      city:formFields.city,
+      phone: formFields.phone,
+      city: formFields.city,
       officeEmail: officeEmail,
       employeeId: employeeId,
       profileImage: req.file?.path || "",
-      heardFrom:formFields.heardFrom,
-      selectedRole:formFields.selectedRole,
-      futureVision:formFields.futureVision,
-      onboardingExperience:formFields.onboardingExperience,
+      heardFrom: formFields.heardFrom,
+      selectedRole: formFields.selectedRole,
+      futureVision: formFields.futureVision,
+      onboardingExperience: formFields.onboardingExperience,
       createdAt: new Date().toISOString()
     });
 
@@ -163,23 +148,21 @@ app.get("/api/generate-empid", async (req, res) => {
   }
 });
 
-
-const exportPath = path.join(__dirname, 'exports', 'form_submissions.xlsx');
-
 app.get('/download-submissions', (req, res) => {
-    if (fs.existsSync(exportPath)) {
-        res.download(exportPath, 'form_submissions.xlsx', (err) => {
-            if (err) {
-                console.error("Download error:", err);
-                res.status(500).send("Failed to download file");
-            }
-        });
-    } else {
-        res.status(404).send("File not found");
-    }
+  if (fs.existsSync(excelFilePath)) {
+    res.download(excelFilePath, 'form_submissions.xlsx', (err) => {
+      if (err) {
+        console.error("Download error:", err);
+        res.status(500).send("Failed to download file");
+      }
+    });
+  } else {
+    res.status(404).send("File not found");
+  }
 });
 
-app.get('/',(req,res)=>{
+
+app.get('/', (req, res) => {
   res.send("Hello")
 })
 
