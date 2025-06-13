@@ -4,6 +4,7 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const saveToExcel = require('./saveToExcel');
 require('dotenv').config();
 
 const FormSubmission = require('./models/FormSubmission');
@@ -35,7 +36,7 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
   try {
     const formFields = JSON.parse(req.body.formData);
 
-    const { firstName, lastName,email } = formFields;
+    const { firstName, lastName, email } = formFields;
 
     const existingUser = await FormSubmission.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
@@ -51,7 +52,7 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
     });
 
     let suffix = "";
-    if(count>1){
+    if (count > 1) {
       suffix = String(count).padStart(2, '0'); // e.g., 01, 02
     }
 
@@ -71,6 +72,37 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
     });
 
     await newSubmission.save();
+
+    /*
+    firstName: String,
+    lastName: String,
+    email: String,
+    phone: String,
+    city: String,
+    profileImage: String, // You'll need to handle file uploads separately
+    heardFrom: String,
+    selectedRole: String,
+    futureVision: String,
+    onboardingExperience: String,
+    officeEmail: String,
+    employeeId: String,
+    */
+
+    saveToExcel({
+      firstName,
+      lastName,
+      email,
+      phone:formFields.phone,
+      city:formFields.city,
+      officeEmail: officeEmail,
+      employeeId: employeeId,
+      profileImage: req.file?.path || "",
+      heardFrom:formFields.heardFrom,
+      selectedRole:formFields.selectedRole,
+      futureVision:formFields.futureVision,
+      onboardingExperience:formFields.onboardingExperience,
+      createdAt: new Date().toISOString()
+    });
 
     res.status(200).json({ message: "Form submitted successfully!", officeEmail, employeeId });
 
@@ -107,7 +139,7 @@ app.post("/api/generate-email", async (req, res) => {
 
     // Generate email with count + 1
     let suffix = "";
-    if(count>1){
+    if (count > 1) {
       suffix = String(count).padStart(2, '0'); // e.g., 01, 02
     }
     const finalEmail = `${base}${suffix}@${domain}`;
@@ -131,13 +163,21 @@ app.get("/api/generate-empid", async (req, res) => {
   }
 });
 
-// app.all("/*",(req,res)=>{
-//   res.send("Hello")
-// })
 
-// app.all("*",(req,res)=>{
-//   res.send("Hello")
-// })
+const exportPath = path.join(__dirname, 'exports', 'form_submissions.xlsx');
+
+app.get('/download-submissions', (req, res) => {
+    if (fs.existsSync(exportPath)) {
+        res.download(exportPath, 'form_submissions.xlsx', (err) => {
+            if (err) {
+                console.error("Download error:", err);
+                res.status(500).send("Failed to download file");
+            }
+        });
+    } else {
+        res.status(404).send("File not found");
+    }
+});
 
 
 const PORT = process.env.PORT || 5000;
