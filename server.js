@@ -148,6 +148,18 @@ app.get("/api/generate-empid", async (req, res) => {
   }
 });
 
+// Add new endpoint to check for duplicate emails
+app.post("/api/check-email", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const existingUser = await FormSubmission.findOne({ email: email.toLowerCase().trim() });
+    res.json({ exists: !!existingUser });
+  } catch (err) {
+    console.error("Email check error:", err);
+    res.status(500).json({ error: "Failed to check email" });
+  }
+});
+
 // app.get('/download-submissions', (req, res) => {
 //   if (fs.existsSync(excelFilePath)) {
 //     res.download(excelFilePath, 'form_submissions.xlsx', (err) => {
