@@ -181,20 +181,33 @@ app.post("/api/check-email", async (req, res) => {
 app.post("/api/validate-city", async (req, res) => {
   try {
     const { city } = req.body;
-    
-    // Call Nominatim API to validate city
+    if (!city || typeof city !== 'string' || city.trim().length === 0) {
+      return res.json({ isValid: false });
+    }
+
+    // Call Nominatim API with improved parameters for Indian cities
     const response = await axios.get(`https://nominatim.openstreetmap.org/search`, {
       params: {
-        q: city,
+        q: `${city}, India`, // Add India to the search query
         format: 'json',
-        limit: 1
+        limit: 1,
+        countrycodes: 'in', // Only search in India
+        addressdetails: 1,
+        featuretype: 'city,town,village' // Only look for cities, towns, and villages
       },
       headers: {
         'User-Agent': 'EmployeeBadgeApp/1.0'
       }
     });
 
-    const isValid = response.data.length > 0;
+    // Check if we got a valid result and it's a city/town/village in India
+    const isValid = response.data.length > 0 && 
+                   response.data[0].address &&
+                   response.data[0].address.country === 'India' &&
+                   (response.data[0].address.city || 
+                    response.data[0].address.town || 
+                    response.data[0].address.village);
+
     res.json({ isValid });
   } catch (err) {
     console.error("City validation error:", err);
