@@ -177,58 +177,6 @@ app.post("/api/check-email", async (req, res) => {
   }
 });
 
-// Add new endpoint to validate city
-app.post("/api/validate-city", async (req, res) => {
-  try {
-    const { city } = req.body;
-    if (!city || typeof city !== 'string' || city.trim().length === 0) {
-      return res.json({ isValid: false });
-    }
-
-    // Call Nominatim API with improved parameters for Indian cities
-    const response = await axios.get(`https://nominatim.openstreetmap.org/search`, {
-      params: {
-        q: `${city}, India`, // Add India to the search query
-        format: 'json',
-        limit: 1,
-        countrycodes: 'in', // Only search in India
-        addressdetails: 1,
-        featuretype: 'city,town,village' // Only look for cities, towns, and villages
-      },
-      headers: {
-        'User-Agent': 'EmployeeBadgeApp/1.0'
-      }
-    });
-
-    // Check if we got a valid result and it's a city/town/village in India
-    const isValid = response.data.length > 0 && 
-                   response.data[0].address &&
-                   response.data[0].address.country === 'India' &&
-                   (response.data[0].address.city || 
-                    response.data[0].address.town || 
-                    response.data[0].address.village);
-
-    res.json({ isValid });
-  } catch (err) {
-    console.error("City validation error:", err);
-    res.status(500).json({ error: "Failed to validate city" });
-  }
-});
-
-// app.get('/download-submissions', (req, res) => {
-//   if (fs.existsSync(excelFilePath)) {
-//     res.download(excelFilePath, 'form_submissions.xlsx', (err) => {
-//       if (err) {
-//         console.error("Download error:", err);
-//         res.status(500).send("Failed to download file");
-//       }
-//     });
-//   } else {
-//     res.status(404).send("File not found");
-//   }
-// });
-
-
 app.get('/', (req, res) => {
   res.send("Hello")
 })
