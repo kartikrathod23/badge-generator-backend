@@ -4,6 +4,7 @@ const cors = require('cors');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
+const axios = require('axios');
 // const { saveToExcel, excelFilePath } = require('./saveToExcel');
 require('dotenv').config();
 
@@ -36,7 +37,23 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
   try {
     const formFields = JSON.parse(req.body.formData);
 
-    const { firstName, lastName, email } = formFields;
+    const { firstName, lastName, email, city } = formFields;
+
+    // Validate city first
+    const cityResponse = await axios.get(`https://nominatim.openstreetmap.org/search`, {
+      params: {
+        q: city,
+        format: 'json',
+        limit: 1
+      },
+      headers: {
+        'User-Agent': 'EmployeeBadgeApp/1.0'
+      }
+    });
+
+    if (cityResponse.data.length === 0) {
+      return res.status(400).json({ message: "Please enter a valid city" });
+    }
 
     const existingUser = await FormSubmission.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
@@ -157,6 +174,31 @@ app.post("/api/check-email", async (req, res) => {
   } catch (err) {
     console.error("Email check error:", err);
     res.status(500).json({ error: "Failed to check email" });
+  }
+});
+
+// Add new endpoint to validate city
+app.post("/api/validate-city", async (req, res) => {
+  try {
+    const { city } = req.body;
+    
+    // Call Nominatim API to validate city
+    const response = await axios.get(`https://nominatim.openstreetmap.org/search`, {
+      params: {
+        q: city,
+        format: 'json',
+        limit: 1
+      },
+      headers: {
+        'User-Agent': 'EmployeeBadgeApp/1.0'
+      }
+    });
+
+    const isValid = response.data.length > 0;
+    res.json({ isValid });
+  } catch (err) {
+    console.error("City validation error:", err);
+    res.status(500).json({ error: "Failed to validate city" });
   }
 });
 
