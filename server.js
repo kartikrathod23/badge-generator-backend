@@ -5,6 +5,8 @@ const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
 const axios = require('axios');
+const ExcelJS = require('exceljs');
+const { createClient } = require('@supabase/supabase-js');
 // const { saveToExcel, excelFilePath } = require('./saveToExcel');
 require('dotenv').config();
 
@@ -24,6 +26,54 @@ const upload = require('./config/multer');
 
 app.use('/uploads', express.static('uploads'));
 
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+const supabaseBucket = process.env.SUPABASE_BUCKET;
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Helper to generate and upload Excel to Supabase
+async function saveToExcelAndUpload(data) {
+  // 1. Create workbook and worksheet
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Employees');
+
+  // 2. Add header row
+  worksheet.addRow([
+    'First Name', 'Last Name', 'Email', 'Phone', 'City', 'Office Email', 'Employee ID', 'Profile Image', 'Heard From', 'Selected Role', 'Future Vision', 'Onboarding Experience', 'Created At'
+  ]);
+
+  // 3. Add data row
+  worksheet.addRow([
+    data.firstName,
+    data.lastName,
+    data.email,
+    data.phone,
+    data.city,
+    data.officeEmail,
+    data.employeeId,
+    data.profileImage,
+    data.heardFrom,
+    data.selectedRole,
+    data.futureVision,
+    data.onboardingExperience,
+    new Date().toISOString()
+  ]);
+
+  // 4. Write to buffer
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  // 5. Upload to Supabase Storage
+  const { error } = await supabase.storage
+    .from(supabaseBucket)
+    .upload(`employees/${data.employeeId}.xlsx`, buffer, {
+      contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      upsert: true
+    });
+  if (error) {
+    console.error('Supabase upload error:', error);
+    throw new Error('Failed to upload Excel to Supabase');
+  }
+}
 
 // Connect to MongoDB
 mongoose.connect(process.env.MONGO_URI, {
@@ -90,21 +140,26 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
 
     await newSubmission.save();
 
-    // saveToExcel({
-    //   firstName,
-    //   lastName,
-    //   email,
-    //   phone: formFields.phone,
-    //   city: formFields.city,
-    //   officeEmail: officeEmail,
-    //   employeeId: employeeId,
-    //   profileImage: req.file?.path || "",
-    //   heardFrom: formFields.heardFrom,
-    //   selectedRole: formFields.selectedRole,
-    //   futureVision: formFields.futureVision,
-    //   onboardingExperience: formFields.onboardingExperience,
-    //   createdAt: new Date().toISOString()
-    // });
+    // Save to Excel and upload to Supabase
+    try {
+      await saveToExcelAndUpload({
+        firstName,
+        lastName,
+        email,
+        phone: formFields.phone,
+        city: formFields.city,
+        officeEmail: officeEmail,
+        employeeId: employeeId,
+        profileImage: req.file?.path || "",
+        heardFrom: formFields.heardFrom,
+        selectedRole: formFields.selectedRole,
+        futureVision: formFields.futureVision,
+        onboardingExperience: formFields.onboardingExperience,
+      });
+    } catch (excelErr) {
+      console.error('Excel upload error:', excelErr);
+      // Optionally, you can return a warning but not fail the whole request
+    }
 
     res.status(200).json({ message: "Form submitted successfully!", officeEmail, employeeId });
 
@@ -113,18 +168,6 @@ app.post('/submit', upload.single('profileImage'), async (req, res) => {
     res.status(500).json({ message: "Failed to submit form" });
   }
 });
-
-
-// Get all form submissions
-// app.get('/submissions', async (req, res) => {
-//   try {
-//     const submissions = await FormSubmission.find().sort({ createdAt: -1 });
-//     res.json(submissions);
-//   } catch (error) {
-//     console.error("Fetch error:", error);
-//     res.status(500).json({ message: "Failed to fetch submissions" });
-//   }
-// });
 
 app.post("/api/generate-email", async (req, res) => {
   const { firstName, lastName } = req.body;
@@ -174,6 +217,44 @@ app.post("/api/check-email", async (req, res) => {
   } catch (err) {
     console.error("Email check error:", err);
     res.status(500).json({ error: "Failed to check email" });
+  }
+});
+
+app.get('/api/download-employees-excel', async (req, res) => {
+  try {
+    const employees = await FormSubmission.find(); // Fetch all employees
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Employees');
+    worksheet.addRow([
+      'First Name', 'Last Name', 'Email', 'Phone', 'City', 'Office Email', 'Employee ID', 'Profile Image', 'Heard From', 'Selected Role', 'Future Vision', 'Onboarding Experience', 'Created At'
+    ]);
+
+    employees.forEach(emp => {
+      worksheet.addRow([
+        emp.firstName,
+        emp.lastName,
+        emp.email,
+        emp.phone,
+        emp.city,
+        emp.officeEmail,
+        emp.employeeId,
+        emp.profileImage,
+        emp.heardFrom,
+        emp.selectedRole,
+        emp.futureVision,
+        emp.onboardingExperience,
+        emp.createdAt ? emp.createdAt.toISOString() : ''
+      ]);
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=all_employees.xlsx');
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Failed to generate Excel');
   }
 });
 
